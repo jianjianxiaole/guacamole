@@ -36,7 +36,8 @@ object Guacamole extends Logging {
   private val commands: Seq[Command[_]] = List(
     GermlineThreshold.Caller,
     GermlineStandard.Caller,
-    SomaticStandard.Caller
+    SomaticStandard.Caller,
+    ReadDepthHist.Cmd
   )
 
   private def printUsage() = {
