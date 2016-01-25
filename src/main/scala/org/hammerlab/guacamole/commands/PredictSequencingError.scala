@@ -203,10 +203,10 @@ object PredictSequencingError {
       val filters = Read.InputFilters(mapped = true, nonDuplicate = true, passedVendorQualityChecks = true)
       val reads = Common.loadReadsFromArguments(args, sc, filters)
 
-      val loci = Common.loci(args, reads)
+      val loci = Common.loci(args)
       val lociPartitions = DistributedUtil.partitionLociAccordingToArgs(
         args,
-        loci,
+        loci.result(reads.contigLengths),
         reads.mappedReads
       )
 
@@ -258,15 +258,14 @@ object PredictSequencingError {
       reads.mappedReads,
       lociPartitions,
       skipEmpty = true,
-      pileup =>
+      function = (pileup =>
         if (pileup.depth < 200) {
-          pileup
-            .elements
-            .flatMap(LocusErrorVector(_, contextLength))
-            .map(el => ((pileup.head.read.referenceContig, pileup.locus), el)).iterator
+          val errorVectors = pileup.elements.flatMap(LocusErrorVector(_, contextLength))
+          errorVectors.map(el => ((pileup.head.read.referenceContig, pileup.locus), el)).iterator
         } else {
           Iterator.empty
-        }
+        }),
+      reference = None
     )
 
     val allAlternatesWithDBSnp = allAlternates.leftOuterJoin(dbSNPKeyedVariants)
