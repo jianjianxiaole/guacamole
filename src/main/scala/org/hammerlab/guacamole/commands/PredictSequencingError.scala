@@ -8,12 +8,13 @@ import org.apache.spark.mllib.optimization.{ LBFGS, LogisticGradient, SquaredL2U
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.rdd.RDD
-import org.bdgenomics.adam.rdd.ADAMContext
+import org.bdgenomics.adam.models.ReferenceRegion
+import org.bdgenomics.adam.rdd.{ShuffleRegionJoin, BroadcastRegionJoin, ADAMContext}
 import org.bdgenomics.formats.avro.Variant
 import org.hammerlab.guacamole.Common.Arguments.Reads
 import org.hammerlab.guacamole._
 import org.hammerlab.guacamole.pileup.{ Match, Mismatch, PileupElement }
-import org.hammerlab.guacamole.reads.Read
+import org.hammerlab.guacamole.reads.{MappedRead, Read}
 import org.kohsuke.args4j.{ Option => Opt }
 
 case class LocusErrorVector(reference: Byte,
@@ -254,8 +255,18 @@ object PredictSequencingError {
 
     val dbSNPKeyedVariants: RDD[((String, Long), Variant)] = loadDbSNPPositions(sc, dbSNPVCFFile)
 
+    def mappedReadToReferenceRegion(mappedRead: MappedRead) = {
+      ReferenceRegion(mappedRead.referenceContig, mappedRead.start, mappedRead.end)
+    }
+
+    val mappedReads = reads.mappedReads
+    val keyedMappedReads = mappedReads.keyBy(mappedReadToReferenceRegion)
+    val regionKeyedVariants = dbSNPKeyedVariants.keyBy(v => ReferenceRegion(v._1._1, v._1._2, v._1._2 + 1))
+    val join = ShuffleRegionJoin(reads.sequenceDictionary.get, 10000)
+    val dbSnpReads = join.partitionAndJoin(keyedMappedReads, regionKeyedVariants).map(_._1)
+
     val allAlternates = DistributedUtil.pileupFlatMap[((String, Long), LocusErrorVector)](
-      reads.mappedReads,
+      dbSnpReads,
       lociPartitions,
       skipEmpty = true,
       function = (pileup =>
