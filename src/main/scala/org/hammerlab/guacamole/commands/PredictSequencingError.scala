@@ -9,7 +9,7 @@ import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.rdd.RDD
 import org.bdgenomics.adam.models.ReferenceRegion
-import org.bdgenomics.adam.rdd.{ADAMContext, ShuffleRegionJoin}
+import org.bdgenomics.adam.rdd.{BroadcastRegionJoin, ADAMContext, ShuffleRegionJoin}
 import org.bdgenomics.formats.avro.Variant
 import org.hammerlab.guacamole.Common.Arguments.Reads
 import org.hammerlab.guacamole._
@@ -204,18 +204,30 @@ object PredictSequencingError {
       val filters = Read.InputFilters(mapped = true, nonDuplicate = true, passedVendorQualityChecks = true)
       val reads = Common.loadReadsFromArguments(args, sc, filters)
 
+      val dbSNPKeyedVariants: RDD[((String, Long), Variant)] = loadDbSNPPositions(sc, args.dbSNPVCFFile)
+
+      def mappedReadToReferenceRegion(mappedRead: MappedRead) = {
+        ReferenceRegion(mappedRead.referenceContig, mappedRead.start, mappedRead.end)
+      }
+
+      val mappedReads = reads.mappedReads
+      val keyedMappedReads = mappedReads.keyBy(mappedReadToReferenceRegion)
+      val regionKeyedVariants = dbSNPKeyedVariants.keyBy(v => ReferenceRegion(v._1._1, v._1._2, v._1._2 + 1))
+      // val join = ShuffleRegionJoin(reads.sequenceDictionary.get, 10000)
+      val dbSnpReads = BroadcastRegionJoin.partitionAndJoin(keyedMappedReads, regionKeyedVariants).coalesce(sc.defaultParallelism).map(_._1)
+
       val loci = Common.loci(args)
       val lociPartitions = DistributedUtil.partitionLociAccordingToArgs(
         args,
         loci.result(reads.contigLengths),
-        reads.mappedReads
+        dbSnpReads
       )
 
       val (positiveAlternates, negativeAlternates) =
         buildMismatchData(
           sc,
-          reads,
-          args.dbSNPVCFFile,
+          dbSnpReads,
+          dbSNPKeyedVariants,
           lociPartitions,
           args.contextLength,
           args.fraction / 100.0f)
@@ -247,26 +259,16 @@ object PredictSequencingError {
   }
 
   def buildMismatchData(sc: SparkContext,
-                        reads: ReadSet,
-                        dbSNPVCFFile: String,
+                        reads: RDD[MappedRead],
+                        dbSNPKeyedVariants: RDD[((String, Long), Variant)],
                         lociPartitions: LociMap[Long],
                         contextLength: Int,
                         sampleFraction: Float) = {
 
-    val dbSNPKeyedVariants: RDD[((String, Long), Variant)] = loadDbSNPPositions(sc, dbSNPVCFFile)
 
-    def mappedReadToReferenceRegion(mappedRead: MappedRead) = {
-      ReferenceRegion(mappedRead.referenceContig, mappedRead.start, mappedRead.end)
-    }
-
-    val mappedReads = reads.mappedReads
-    val keyedMappedReads = mappedReads.keyBy(mappedReadToReferenceRegion)
-    val regionKeyedVariants = dbSNPKeyedVariants.keyBy(v => ReferenceRegion(v._1._1, v._1._2, v._1._2 + 1))
-    val join = ShuffleRegionJoin(reads.sequenceDictionary.get, 10000)
-    val dbSnpReads = join.partitionAndJoin(keyedMappedReads, regionKeyedVariants).coalesce(sc.defaultParallelism).map(_._1)
 
     val allAlternates = DistributedUtil.pileupFlatMap[((String, Long), LocusErrorVector)](
-      dbSnpReads,
+      reads,
       lociPartitions,
       skipEmpty = true,
       function = (pileup =>
