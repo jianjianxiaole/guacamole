@@ -39,6 +39,7 @@ import org.hammerlab.guacamole.distributed.LociPartitionUtils
 import org.hammerlab.guacamole.loci.LociSet
 import org.hammerlab.guacamole.reads.Read
 import org.kohsuke.args4j.{Option => Args4jOption}
+import org.seqdoop.hadoop_bam.util.SAMHeaderReader
 
 /**
  * Basic functions that most commands need, and specifications of command-line arguments that they use.
@@ -393,6 +394,10 @@ object Common extends Logging {
 
     if (config.getOption("spark.kryo.referenceTracking").isEmpty) {
       config.set("spark.kryo.referenceTracking", "true")
+    }
+
+    if (config.getOption(SAMHeaderReader.VALIDATION_STRINGENCY_PROPERTY).isEmpty) {
+      config.set(SAMHeaderReader.VALIDATION_STRINGENCY_PROPERTY, "LENIENT")
     }
 
     new SparkContext(config)
