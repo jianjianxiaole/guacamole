@@ -18,7 +18,7 @@
 
 package org.hammerlab.guacamole.reads
 
-import java.io.File
+import java.io.{BufferedReader, File, InputStream, InputStreamReader}
 
 import htsjdk.samtools._
 import org.apache.hadoop.fs.Path
@@ -32,7 +32,6 @@ import org.hammerlab.guacamole.loci.LociSet
 import org.hammerlab.guacamole.{Bases, Common}
 import org.seqdoop.hadoop_bam.util.SAMHeaderReader
 import org.seqdoop.hadoop_bam.{AnySAMInputFormat, SAMRecordWritable}
-
 import scala.collection.JavaConversions
 
 /**
@@ -313,6 +312,29 @@ object Read extends Logging {
     }
   }
 
+  class TransformingInputStream(baseStream: InputStream, transformations: Seq[String => String]) extends InputStream {
+    val reader = new BufferedReader(new InputStreamReader(baseStream))
+    var currentLine: Option[String] = None
+    var positionInLine: Int = 0
+
+    override def read(): Int = {
+      if (currentLine.isEmpty) {
+        var line = reader.readLine()
+        transformations.foreach(transformation => {
+          line = transformation(line)
+        })
+        currentLine = Some(line + "\n")
+        positionInLine = 0
+      }
+      val result = currentLine.get.codePointAt(positionInLine)
+      positionInLine += 1
+      if (positionInLine == currentLine.size) {
+        currentLine = None
+      }
+      result
+    }
+  }
+
   /** Returns an RDD of Reads and SequenceDictionary from reads in BAM format **/
   def loadReadRDDAndSequenceDictionaryFromBAM(
     filename: String,
@@ -378,7 +400,16 @@ object Read extends Logging {
     } else {
       // Load with hadoop bam
       Common.progress("Using hadoop bam to read: %s".format(filename))
-      val samHeader = SAMHeaderReader.readSAMHeaderFrom(path, sc.hadoopConfiguration)
+
+      val headerStream = path.getFileSystem(sc.hadoopConfiguration).open(path)
+
+      def fixEmptySampleNames(line: String) = {
+        line.replace("SM:\t", "SM:none\t")
+      }
+
+      val transformedStream = new TransformingInputStream(headerStream, Seq(fixEmptySampleNames))
+      val samHeader = SAMHeaderReader.readSAMHeaderFrom(transformedStream, sc.hadoopConfiguration)
+      headerStream.close()
       val sequenceDictionary = SequenceDictionary.fromSAMHeader(samHeader)
 
       val samRecords: RDD[(LongWritable, SAMRecordWritable)] =
