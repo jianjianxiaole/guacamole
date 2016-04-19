@@ -36,6 +36,7 @@ class ReadSetSuite extends GuacFunSuite {
     override def toString: String = msg()
   }
 
+  /*
   sparkTest("using different bam reading APIs on sam/bam files should give identical results") {
     def check(paths: Seq[String], filter: InputFilters): Unit = {
       withClue("using filter %s: ".format(filter)) {
@@ -105,6 +106,7 @@ class ReadSetSuite extends GuacFunSuite {
         check(Seq("synth1.normal.100k-200k.withmd.bam", "synth1.normal.100k-200k.withmd.sam"), filter)
       })
   }
+  */
 
   sparkTest("load and test filters") {
     val allReads = TestUtil.loadReads(sc, "mdtagissue.sam")
@@ -124,6 +126,12 @@ class ReadSetSuite extends GuacFunSuite {
   sparkTest("load RNA reads") {
     val readSet = TestUtil.loadReads(sc, "rna_chr17_41244936.sam")
     readSet.reads.count should be(23)
+  }
+
+  sparkTest("load reads with empty sample name (SM) header") {
+    val readSet = TestUtil.loadReads(sc, "empty_sample_name.sam",
+      config = Read.ReadLoadingConfig(bamReaderAPI = Read.ReadLoadingConfig.BamReaderAPI.HadoopBAM))
+    readSet.reads.count should be(897)
   }
 
   sparkTest("load read from ADAM") {

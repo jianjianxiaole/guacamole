@@ -312,23 +312,24 @@ object Read extends Logging {
     }
   }
 
-  class TransformingInputStream(baseStream: InputStream, transformations: Seq[String => String]) extends InputStream {
+  class TransformingInputStream(baseStream: InputStream, lineTransformation: String => String) extends InputStream {
     val reader = new BufferedReader(new InputStreamReader(baseStream))
     var currentLine: Option[String] = None
     var positionInLine: Int = 0
 
     override def read(): Int = {
       if (currentLine.isEmpty) {
-        var line = reader.readLine()
-        transformations.foreach(transformation => {
-          line = transformation(line)
-        })
-        currentLine = Some(line + "\n")
+        val rawLine = reader.readLine()
+        println(rawLine)
+        if (rawLine == null || !rawLine.startsWith("@")) {
+          return -1
+        }
+        currentLine = Some(lineTransformation(rawLine + "\n"))
         positionInLine = 0
       }
-      val result = currentLine.get.codePointAt(positionInLine)
+      val result = currentLine.get(positionInLine)
       positionInLine += 1
-      if (positionInLine == currentLine.size) {
+      if (positionInLine == currentLine.get.length) {
         currentLine = None
       }
       result
@@ -404,13 +405,19 @@ object Read extends Logging {
       val headerStream = path.getFileSystem(sc.hadoopConfiguration).open(path)
 
       def fixEmptySampleNames(line: String) = {
-        line.replace("SM:\t", "SM:none\t")
+        if (line.startsWith("@RG") && line.contains("SM:\t")) {
+          logInfo(s"Using empty sample name (SM) htsjdk header parsing workaround for line: $line")
+          line.replace("SM:\t", "SM:none\t")
+        } else {
+          line
+        }
       }
 
-      val transformedStream = new TransformingInputStream(headerStream, Seq(fixEmptySampleNames))
-      val samHeader = SAMHeaderReader.readSAMHeaderFrom(transformedStream, sc.hadoopConfiguration)
-      headerStream.close()
-      val sequenceDictionary = SequenceDictionary.fromSAMHeader(samHeader)
+      // val transformedStream = new TransformingInputStream(headerStream, fixEmptySampleNames)
+      // val samHeader = SAMHeaderReader.readSAMHeaderFrom(transformedStream, sc.hadoopConfiguration)
+      // headerStream.close()
+      val sequenceDictionary = SequenceDictionary.empty
+      // val sequenceDictionary = SequenceDictionary.fromSAMHeader(samHeader)
 
       val samRecords: RDD[(LongWritable, SAMRecordWritable)] =
         sc.newAPIHadoopFile[LongWritable, SAMRecordWritable, AnySAMInputFormat](filename)
