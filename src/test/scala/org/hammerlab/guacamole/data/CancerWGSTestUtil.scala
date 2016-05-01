@@ -7,7 +7,7 @@ import org.hammerlab.guacamole.util.TestUtil
 object CancerWGSTestUtil {
 
   val bams =
-    Seq("normal.bam", "primary.bam", "recurrence.bam")
+    Vector("normal.bam", "primary.bam", "recurrence.bam")
       .map(name => TestUtil.testDataPath(s"cancer-wgs1/$name"))
 
   val expectedSomaticCallsCSV = TestUtil.testDataPath("cancer-wgs1/variants.csv")

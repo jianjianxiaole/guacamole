@@ -446,7 +446,6 @@ object DeBruijnGraph {
     val referenceKmerSource = referenceSequence.take(kmerSize)
     val referenceKmerSink = referenceSequence.takeRight(kmerSize)
 
-
     val currentGraph: DeBruijnGraph = DeBruijnGraph(
       reads,
       kmerSize,

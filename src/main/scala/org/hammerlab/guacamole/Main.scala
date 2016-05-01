@@ -36,6 +36,7 @@ object Main extends Logging {
    */
   private val commands: Seq[Command[_]] = List(
     GermlineAssemblyCaller.Caller,
+    SomaticAssemblyCaller.Caller,
     SomaticStandard.Caller,
     VariantSupport.Caller,
     VAFHistogram.Caller,

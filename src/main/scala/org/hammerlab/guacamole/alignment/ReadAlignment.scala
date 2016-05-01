@@ -69,4 +69,9 @@ case class ReadAlignment(alignments: Seq[AlignmentState],
     val cigarString = this.toCigarString
     TextCigarCodec.decode(cigarString)
   }
+
+  /** Do all positions match the reference **/
+  def nonVariant: Boolean = {
+    alignments.forall(_ == AlignmentState.Match)
+  }
 }

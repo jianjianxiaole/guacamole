@@ -141,7 +141,8 @@ trait VariantComparisonTest {
     println(comparisonFull.summary)
 
     println("MISSED CALLS")
-    printSamplePairs(comparisonFull.partialMatch.filter(pair => pair._2.getAttribute("TRIGGER") == "NONE"))
+    printSample(comparisonFull.uniqueToExpected, 400)
+    //printSamplePairs(comparisonFull.partialMatch.filter(pair => pair._2.getAttribute("TRIGGER") == "NONE"))
     println()
 
     println("BAD CALLS")

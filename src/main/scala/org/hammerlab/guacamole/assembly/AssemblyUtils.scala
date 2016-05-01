@@ -88,6 +88,8 @@ object AssemblyUtils extends Logging {
     } else if (paths.size <= expectedPloidy) {
       paths
     } else if (paths.size <= maxPathsToScore) {
+      log.warn(s"In window ${referenceContig}:${referenceStart}-$referenceEnd found ${paths.size} paths. " +
+        s"Aligning ${reads.size} reads to discover the best path.")
       (for {
         path <- paths
       } yield {
@@ -126,7 +128,7 @@ object AssemblyUtils extends Logging {
                                                    allowReferenceVariant: Boolean = false): Seq[T] = {
 
     val alignment = alignPath(path)
-    log.warn(s"Building variants from ${alignment.toCigarString} alignment")
+    log.debug(s"Building variants from ${alignment.toCigarString} alignment")
 
     var referenceIndex = alignment.refStartIdx
     var pathIndex = 0
