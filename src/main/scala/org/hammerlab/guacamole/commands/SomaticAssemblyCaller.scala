@@ -238,21 +238,61 @@ object SomaticAssemblyCaller {
       val referenceEnd = (currentLocus + halfWindowSize).toInt
       log.warn(s"Performing variant calling from assembly in ${normalWindow.referenceName}:${referenceStart}-$referenceEnd")
 
-      val topNormalPaths = AssemblyUtils.discoverHaplotypes(
-        normalWindow,
-        kmerSize,
-        reference,
-        minOccurrence
+      val referenceContigName = normalWindow.referenceName
+      val currentReference: Array[Byte] = reference.getReferenceSequence(
+        normalWindow.referenceName,
+        referenceStart,
+        referenceEnd
       )
 
-      lazy val tumorPaths = AssemblyUtils.discoverHaplotypes(
-        tumorWindow,
+      val referenceKmerSource = currentReference.take(kmerSize)
+      val referenceKmerSink = currentReference.takeRight(kmerSize)
+
+      val normalGraph: DeBruijnGraph = DeBruijnGraph(
+        normalWindow.currentRegions().map(_.sequence),
         kmerSize,
-        reference,
-        minOccurrence
+        minOccurrence,
+        mergeNodes = true
       )
 
-      if (topNormalPaths.isEmpty || tumorPaths.isEmpty) {
+      val tumorGraph: DeBruijnGraph = DeBruijnGraph(
+        tumorWindow.currentRegions().map(_.sequence),
+        kmerSize,
+        minOccurrence,
+        mergeNodes = false
+      )
+
+      val tumorKmers =  tumorGraph.kmerCounts.keySet
+      val normalKmers = normalGraph.kmerCounts.keySet
+
+      lazy val normalPaths = AssemblyUtils.scorePaths(
+        normalGraph
+          .depthFirstSearch(referenceKmerSource, referenceKmerSink)
+          .map(DeBruijnGraph.mergeOverlappingSequences(_, kmerSize))
+          .toVector,
+        normalWindow.currentRegions(),
+        referenceContigName,
+        referenceStart,
+        referenceEnd
+      )
+
+      lazy val tumorPaths = AssemblyUtils.scorePaths(
+        tumorGraph
+          .depthFirstSearch(referenceKmerSource, referenceKmerSink)
+          .map(DeBruijnGraph.mergeOverlappingSequences(_, kmerSize))
+          .toVector,
+        tumorWindow.currentRegions(),
+        referenceContigName,
+        referenceStart,
+        referenceEnd
+      )
+
+      if (tumorKmers.diff(normalKmers).isEmpty) {
+        // Advance both windows
+        normalWindow.setCurrentLocus(referenceEnd - kmerSize)
+        tumorWindow.setCurrentLocus(referenceEnd - kmerSize)
+        (lastCalledLocus, Iterator.empty)
+      }  else if (normalPaths.isEmpty || tumorPaths.isEmpty) {
         (lastCalledLocus, Iterator.empty)
       } else {
 
