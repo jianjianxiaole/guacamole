@@ -25,10 +25,10 @@ import org.bdgenomics.adam.serialization.ADAMKryoRegistrator
 import org.hammerlab.guacamole.commands.jointcaller.kryo.{Registrar => JointCallerRegistrar}
 import org.hammerlab.guacamole.distributed.LociPartitionUtils.{LociPartitioning, MicroPartitionIndex, PartitionIndex}
 import org.hammerlab.guacamole.distributed.TaskPosition
-import org.hammerlab.guacamole.loci.map.{LociMap, Contig => LociMapContig, ContigSerializer => LociMapContigSerializer, Serializer => LociMapSerializer}
+import org.hammerlab.guacamole.loci.map.{Contig => LociMapContig, ContigSerializer => LociMapContigSerializer, Serializer => LociMapSerializer}
 import org.hammerlab.guacamole.loci.set.{LociSet, Contig => LociSetContig, ContigSerializer => LociSetContigSerializer, Serializer => LociSetSerializer}
-import org.hammerlab.guacamole.reads.{MappedRead, MappedReadSerializer, MateAlignmentProperties, PairedRead, Read, UnmappedRead, UnmappedReadSerializer}
-import org.hammerlab.guacamole.variants.{Allele, AlleleEvidence, AlleleSerializer, CalledAllele}
+import org.hammerlab.guacamole.reads._
+import org.hammerlab.guacamole.variants._
 
 class Registrar extends KryoRegistrator {
   override def registerClasses(kryo: Kryo) {
@@ -72,6 +72,8 @@ class Registrar extends KryoRegistrator {
     // Germline-assembly caller flatmaps some CalledAlleles.
     kryo.register(classOf[Array[CalledAllele]])
     kryo.register(classOf[CalledAllele])
+    kryo.register(classOf[CalledSomaticAllele])
+    kryo.register(classOf[Array[CalledSomaticAllele]])
     kryo.register(classOf[Allele], new AlleleSerializer)
     kryo.register(classOf[AlleleEvidence])
 
