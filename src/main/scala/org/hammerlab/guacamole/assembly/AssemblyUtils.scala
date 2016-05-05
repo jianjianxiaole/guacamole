@@ -3,6 +3,7 @@ package org.hammerlab.guacamole.assembly
 import htsjdk.samtools.CigarOperator
 import org.apache.spark.Logging
 import org.hammerlab.guacamole.alignment.{AffineGapPenaltyAlignment, ReadAlignment}
+import org.hammerlab.guacamole.assembly.DeBruijnGraph.Sequence
 import org.hammerlab.guacamole.reads.MappedRead
 import org.hammerlab.guacamole.reference.{ContigSequence, ReferenceGenome}
 import org.hammerlab.guacamole.util.CigarUtils
@@ -57,7 +58,7 @@ object AssemblyUtils extends Logging {
     val locus = currentWindow.currentLocus
     val reads = currentWindow.currentRegions()
 
-    val referenceContig = reads.head.referenceContig
+    val referenceContigName = reads.head.referenceContig
 
     val referenceStart = (locus - currentWindow.halfWindowSize).toInt
     val referenceEnd = (locus + currentWindow.halfWindowSize).toInt
@@ -78,17 +79,26 @@ object AssemblyUtils extends Logging {
       maxPaths = maxPathsToScore + 1,
       minMeanKmerBaseQuality = minMeanKmerQuality,
       debugPrint)
-      .map(DeBruijnGraph.mergeOverlappingSequences(_, kmerSize))
-      .toVector
+
+    scorePaths(paths, reads, referenceContigName, referenceStart, referenceEnd, expectedPloidy, maxPathsToScore)
+  }
+
+  def scorePaths(paths: Vector[Sequence],
+                 reads: Vector[MappedRead],
+                 referenceContigName: String,
+                 referenceStart: Int,
+                 referenceEnd: Int,
+                 expectedPloidy: Int = 2,
+                 maxPathsToScore: Int = 20): Vector[Sequence] = {
 
     // Score up to the maximum number of paths
     if (paths.isEmpty) {
-      log.warn(s"In window ${referenceContig}:${referenceStart}-$referenceEnd assembly failed")
-      List.empty
+      log.warn(s"In window ${referenceContigName}:${referenceStart}-$referenceEnd assembly failed")
+      Vector.empty
     } else if (paths.size <= expectedPloidy) {
       paths
     } else if (paths.size <= maxPathsToScore) {
-      log.warn(s"In window ${referenceContig}:${referenceStart}-$referenceEnd found ${paths.size} paths. " +
+      log.warn(s"In window ${referenceContigName}:${referenceStart}-$referenceEnd found ${paths.size} paths. " +
         s"Aligning ${reads.size} reads to discover the best path.")
       (for {
         path <- paths
@@ -103,9 +113,9 @@ object AssemblyUtils extends Logging {
         .map(_._2)
 
     } else {
-      log.warn(s"In window ${referenceContig}:${referenceStart}-$referenceEnd " +
+      log.warn(s"In window ${referenceContigName}:${referenceStart}-$referenceEnd " +
         s"there were ${paths.size} paths found, all variants skipped")
-      List.empty
+      Vector.empty
     }
   }
 
