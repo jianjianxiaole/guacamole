@@ -91,6 +91,7 @@ object SomaticAssemblyCaller {
         reference,
         lociPartitions,
         minDepth = args.minReadDepth,
+        minMeanKmerQuality = args.minMeanKmerQuality,
         minLikelihood = args.minLikelihood,
         oddsThreshold = args.oddsThreshold,
         minAltReads = args.minOccurrence,
@@ -141,6 +142,7 @@ object SomaticAssemblyCaller {
                                  reference: ReferenceBroadcast,
                                  lociPartitions: LociPartitioning,
                                  minLikelihood: Int,
+                                 minMeanKmerQuality: Int,
                                  minDepth: Int,
                                  oddsThreshold: Int,
                                  minAltReads: Int = 3,
@@ -202,6 +204,7 @@ object SomaticAssemblyCaller {
                 tumorWindow,
                 kmerSize,
                 minOccurrence,
+                minMeanKmerQuality,
                 reference,
                 lastCalledLocus,
                 referenceContig)
@@ -227,6 +230,7 @@ object SomaticAssemblyCaller {
                                               tumorWindow: SlidingWindow[MappedRead],
                                               kmerSize: Int,
                                               minOccurrence: Int,
+                                              minMeanKmerQuality: Int,
                                               reference: ReferenceBroadcast,
                                               lastCalledLocus: Option[Long],
                                               referenceContig: ContigSequence): (Option[Long], Iterator[CalledSomaticAllele]) = {
@@ -249,16 +253,18 @@ object SomaticAssemblyCaller {
       val referenceKmerSink = currentReference.takeRight(kmerSize)
 
       val normalGraph: DeBruijnGraph = DeBruijnGraph(
-        normalWindow.currentRegions().map(_.sequence),
+        normalWindow.currentRegions(),
         kmerSize,
         minOccurrence,
+        minMeanKmerQuality,
         mergeNodes = true
       )
 
       val tumorGraph: DeBruijnGraph = DeBruijnGraph(
-        tumorWindow.currentRegions().map(_.sequence),
+        tumorWindow.currentRegions(),
         kmerSize,
         minOccurrence,
+        minMeanKmerQuality,
         mergeNodes = false
       )
 

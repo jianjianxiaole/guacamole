@@ -60,6 +60,7 @@ class SomaticAssemblyCallerSuite extends GuacFunSuite with Matchers with BeforeA
         reference = reference,
         lociPartitions = lociPartitions,
         minDepth = 8,
+        minMeanKmerQuality = 15,
         minLikelihood = 30,
         oddsThreshold = 20,
         shortcutAssembly = shortcutAssembly

@@ -79,6 +79,7 @@ object SomaticAssemblyIntegrationTests extends SparkCommand[Arguments] with Vari
         reference = reference,
         lociPartitions = lociPartitions,
         minDepth = args.minReadDepth,
+        minMeanKmerQuality = args.minMeanKmerQuality,
         minLikelihood = args.minLikelihood,
         oddsThreshold = args.oddsThreshold,
         minAltReads = 3,
