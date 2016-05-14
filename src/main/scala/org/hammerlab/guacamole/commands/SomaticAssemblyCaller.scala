@@ -295,8 +295,8 @@ object SomaticAssemblyCaller {
 
       if (tumorKmers.diff(normalKmers).isEmpty) {
         // Advance both windows
-        normalWindow.setCurrentLocus(referenceEnd - kmerSize)
-        tumorWindow.setCurrentLocus(referenceEnd - kmerSize)
+        normalWindow.setCurrentLocus(referenceEnd)
+        tumorWindow.setCurrentLocus(referenceEnd)
         (lastCalledLocus, Iterator.empty)
       }  else if (normalPaths.isEmpty || tumorPaths.isEmpty) {
         (lastCalledLocus, Iterator.empty)
