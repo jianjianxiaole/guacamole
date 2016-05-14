@@ -5,7 +5,7 @@ import org.apache.spark.rdd.RDD
 import org.bdgenomics.adam.rdd.ADAMContext
 import org.bdgenomics.formats.avro.DatabaseVariantAnnotation
 import org.hammerlab.guacamole.alignment.AffineGapPenaltyAlignment
-import org.hammerlab.guacamole.assembly.AssemblyUtils
+import org.hammerlab.guacamole.assembly.{AssemblyArgs, AssemblyUtils, DeBruijnGraph}
 import org.hammerlab.guacamole.distributed.LociPartitionUtils.{LociPartitioning, partitionLociAccordingToArgs}
 import org.hammerlab.guacamole.distributed.WindowFlatMapUtils.windowFlatMapWithState
 import org.hammerlab.guacamole.logging.{DelayedMessages, LoggingUtils}
@@ -19,25 +19,13 @@ import org.kohsuke.args4j.{Option => Args4jOption}
 
 object SomaticAssemblyCaller {
 
-  class Arguments extends SomaticCallerArgs with Serializable  {
-
-    @Args4jOption(name = "--kmer-size", usage = "Length of kmer used for DeBruijn Graph assembly")
-    var kmerSize: Int = 45
-
-    @Args4jOption(name = "--snv-window-range", usage = "Number of bases before and after to check for additional matches or deletions")
-    var snvWindowRange: Int = 20
+  class Arguments extends AssemblyArgs with SomaticCallerArgs with Serializable  {
 
     @Args4jOption(name = "--min-alignment-quality", usage = "Minimum alignment qualities of the read")
     var minAlignmentQuality: Int = 30
 
     @Args4jOption(name = "--reference-fasta", required = true, usage = "Local path to a reference FASTA file")
     var referenceFastaPath: String = null
-
-    @Args4jOption(name = "--min-area-vaf", required = false, usage = "Minimum variant allele frequency to investigate area")
-    var minAreaVaf: Int = 5
-
-    @Args4jOption(name = "--min-occurrence", required = false, usage = "Minimum occurrences to include a kmer ")
-    var minOccurrence: Int = 3
 
     @Args4jOption(name = "--dbsnp-vcf", required = false, usage = "VCF file to identify DBSNP variants")
     var dbSnpVcf: String = ""
@@ -47,9 +35,6 @@ object SomaticAssemblyCaller {
 
     @Args4jOption(name = "--min-likelihood", usage = "Minimum Phred-scaled likelihood. Default: 0 (off)")
     var minLikelihood: Int = 30
-
-    @Args4jOption(name = "--shortcut-assembly", required = false, usage = "Skip assembly process in inactive regions")
-    var shortcutAssembly: Boolean = false
 
     @Args4jOption(name = "--min-read-depth", usage = "Minimum number of reads for a genotype call")
     var minReadDepth: Int = 8
@@ -100,7 +85,7 @@ object SomaticAssemblyCaller {
         normalQualityReads,
         tumorQualityReads,
         kmerSize = kmerSize,
-        snvWindowRange = args.snvWindowRange,
+        assemblyWindowRange = args.assemblyWindowRange,
         minOccurrence = args.minOccurrence,
         minAreaVaf = args.minAreaVaf / 100.0f,
         reference,
@@ -140,7 +125,7 @@ object SomaticAssemblyCaller {
      * @param normalReads    Mapped reads of the normal sample
      * @param tumorReads     Mapped reads of the tumor sample
      * @param kmerSize       Length of subsequence to use for assembly
-     * @param snvWindowRange Number of bases to consider left and right of the locus
+     * @param assemblyWindowRange Number of bases to consider left and right of the locus
      * @param minOccurrence  Minimum appearances of kmers to include in the graph
      * @param minAreaVaf     Minimum variant allele frequency in a region to compute variants
      * @param reference      Broadcasted reference sequences
@@ -150,7 +135,7 @@ object SomaticAssemblyCaller {
     def discoverSomaticGenotypes(normalReads: RDD[MappedRead],
                                  tumorReads: RDD[MappedRead],
                                  kmerSize: Int,
-                                 snvWindowRange: Int,
+                                 assemblyWindowRange: Int,
                                  minOccurrence: Int,
                                  minAreaVaf: Float,
                                  reference: ReferenceBroadcast,
@@ -166,7 +151,7 @@ object SomaticAssemblyCaller {
           Vector(normalReads, tumorReads),
           lociPartitions,
           skipEmpty = true,
-          halfWindowSize = snvWindowRange,
+          halfWindowSize = assemblyWindowRange,
           initialState = None,
           (lastCalledLocus, windows) => {
             val currentLocus = windows.head.currentLocus

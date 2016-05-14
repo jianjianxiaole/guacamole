@@ -26,7 +26,7 @@ object SomaticAssemblyIntegrationTests extends SparkCommand[Arguments] with Vari
 
   // Somatic assembly config
   callerArgs.kmerSize = 37
-  callerArgs.snvWindowRange = 120
+  callerArgs.assemblyWindowRange = 120
   callerArgs.minAreaVaf = 30
   callerArgs.minOccurrence = 3
   callerArgs.minLikelihood = 50
@@ -73,7 +73,7 @@ object SomaticAssemblyIntegrationTests extends SparkCommand[Arguments] with Vari
         normalReads.mappedReads.filter(_.alignmentQuality > args.minAlignmentQuality),
         tumorReads.mappedReads.filter(_.alignmentQuality > args.minAlignmentQuality),
         kmerSize = args.kmerSize,
-        snvWindowRange = args.snvWindowRange,
+        assemblyWindowRange = args.assemblyWindowRange,
         minOccurrence = args.minOccurrence,
         minAreaVaf = (args.minAreaVaf / 100.0f),
         reference = reference,

@@ -27,16 +27,16 @@ class SomaticAssemblyCallerSuite extends GuacFunSuite with Matchers with BeforeA
   val inputs = InputCollection(CancerWGSTestUtil.bams)
   def verifyVariantsAtLocus(locus: Int,
                             contig: String = "chr1",
-                            kmerSize: Int = 31,
-                            snvWindowRange: Int = 45,
+                            kmerSize: Int = 41,
+                            assemblyWindowRange: Int = 120,
                             minOccurrence: Int = 3,
                             minVaf: Float = 0.1f,
                             shortcutAssembly: Boolean = false)(
                              expectedVariants: (String, Int, String, String)*
                            ) = {
 
-    val windowStart = locus - snvWindowRange
-    val windowEnd = locus + snvWindowRange
+    val windowStart = locus - assemblyWindowRange
+    val windowEnd = locus + assemblyWindowRange
 
     val lociBuilder = LociParser(s"$contig:$windowStart-$windowEnd")
 
@@ -54,7 +54,7 @@ class SomaticAssemblyCallerSuite extends GuacFunSuite with Matchers with BeforeA
         normalReadSet.mappedReads,
         tumorReadSet.mappedReads,
         kmerSize = kmerSize,
-        snvWindowRange = snvWindowRange,
+        assemblyWindowRange = assemblyWindowRange,
         minOccurrence = minOccurrence,
         minAreaVaf = minVaf,
         reference = reference,
@@ -134,7 +134,7 @@ class SomaticAssemblyCallerSuite extends GuacFunSuite with Matchers with BeforeA
   test("test somatic assembly caller: call somatic variant near germline variant") {
     // Germline variant G>A at 4:120371251
     // Somatic variant G>C at 4:120371197
-    verifyVariantsAtLocus(120371197, "chr4", snvWindowRange = 60)(
+    verifyVariantsAtLocus(120371197, "chr4", assemblyWindowRange = 60)(
       ("chr4", 120371197, "G", "C")
     )
   }
