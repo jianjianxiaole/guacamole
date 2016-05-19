@@ -240,9 +240,10 @@ object SomaticAssemblyCaller {
 
       val referenceStart = (currentLocus - halfWindowSize).toInt
       val referenceEnd = (currentLocus + halfWindowSize).toInt
-      log.warn(s"Performing variant calling from assembly in ${normalWindow.referenceName}:${referenceStart}-$referenceEnd")
 
       val referenceContigName = normalWindow.referenceName
+      log.warn(s"Performing variant calling from assembly in ${referenceContigName}:${referenceStart}-$referenceEnd")
+
       val currentReference: Array[Byte] = reference.getReferenceSequence(
         normalWindow.referenceName,
         referenceStart,
@@ -253,15 +254,19 @@ object SomaticAssemblyCaller {
       val referenceKmerSink = currentReference.takeRight(kmerSize)
 
       val normalGraph: DeBruijnGraph = DeBruijnGraph(
-        normalWindow.currentRegions(),
+        normalWindow
+          .currentRegions()
+          .flatMap(_.slice(referenceStart, referenceEnd, reference.getContig(referenceContigName))),
         kmerSize,
         minOccurrence,
         minMeanKmerQuality,
-        mergeNodes = true
+        mergeNodes = false
       )
 
       val tumorGraph: DeBruijnGraph = DeBruijnGraph(
-        tumorWindow.currentRegions(),
+        tumorWindow
+          .currentRegions()
+          .flatMap(_.slice(referenceStart, referenceEnd, reference.getContig(referenceContigName))),
         kmerSize,
         minOccurrence,
         minMeanKmerQuality,
@@ -292,9 +297,10 @@ object SomaticAssemblyCaller {
         referenceStart,
         referenceEnd
       )
-
-      if (tumorKmers.diff(normalKmers).isEmpty) {
+      val tumorExclusiveKmers = tumorKmers.diff(normalKmers)
+      if (tumorExclusiveKmers.isEmpty) {
         // Advance both windows
+        log.warn(s"Skipping region ${normalWindow.referenceName}:${referenceStart}-$referenceEnd, normal and tumor kmers match")
         normalWindow.setCurrentLocus(referenceEnd)
         tumorWindow.setCurrentLocus(referenceEnd)
         (lastCalledLocus, Iterator.empty)

@@ -112,7 +112,7 @@ case class MappedRead(
    * @return A read which spans [from, until) or None if the provided coordinates do not overlap the read
    */
   def slice(from: Long, until: Long, referenceContigSequence: ContigSequence): Option[MappedRead] = {
-    if (from >= end || until < start) {
+    if (from >= end || until <= start) {
       None
     } else if (from <= start && until >= end) {
       Some(this)
